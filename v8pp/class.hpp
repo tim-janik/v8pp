@@ -483,6 +483,9 @@ public:
 		while (value->IsObject())
 		{
 			v8::Handle<v8::Object> obj = value->ToObject();
+                        if (0)
+                          printf ("unwrap_object: isolate_=%p context_=%p this=%p proto=%p InternalFieldCount=%d\n",
+                                  isolate_, *isolate_->GetCurrentContext(), *obj, *obj->GetPrototype(), obj->InternalFieldCount());
 			if (obj->InternalFieldCount() == 2)
 			{
 				void* ptr = obj->GetAlignedPointerFromInternalField(0);
