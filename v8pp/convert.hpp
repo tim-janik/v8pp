@@ -562,6 +562,7 @@ struct convert<T, typename std::enable_if<is_wrapped_class<T>::value>::type>
 {
 	using from_type = T&;
 	using to_type = v8::Handle<v8::Object>;
+	using class_type = typename std::remove_cv<T>::type;
 
 	static bool is_valid(v8::Isolate* isolate, v8::Handle<v8::Value> value)
 	{
@@ -578,14 +579,16 @@ struct convert<T, typename std::enable_if<is_wrapped_class<T>::value>::type>
 		{
 			return *object;
 		}
-		throw std::runtime_error("expected C++ wrapped object");
+		throw std::runtime_error("failed to unwrap C++ object");
 	}
 
 	static to_type to_v8(v8::Isolate* isolate, T const& value)
 	{
-		v8::Handle<v8::Object> result = convert<T*>::to_v8(isolate, &value);
+		v8::Handle<v8::Object> result = class_<class_type>::find_object(isolate, &value);
 		if (!result.IsEmpty()) return result;
-		throw std::runtime_error("expected C++ wrapped object");
+                class_type* obj = v8pp::factory<class_type>::create(isolate, value);
+		if (!obj) throw std::runtime_error("failed to wrap C++ object");
+		return class_<class_type>::import_external(isolate, obj);
 	}
 };
 

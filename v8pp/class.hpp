@@ -355,6 +355,8 @@ public:
 		{
 			factory<T>::destroy(isolate, static_cast<T*>(obj));
 		};
+
+                class_function_template()->Inherit(js_function_template());
 	}
 
 	class_singleton(class_singleton const&) = delete;
@@ -370,7 +372,8 @@ public:
 		v8::EscapableHandleScope scope(isolate_);
 
 		v8::Local<v8::Object> obj = class_function_template()
-			->GetFunction()->NewInstance();
+                                            ->GetFunction()->NewInstance (v8::Isolate::GetCurrent()->GetCurrentContext())
+                                            .FromMaybe(v8::Local<v8::Object>());
 		obj->SetAlignedPointerInInternalField(0, object);
 		obj->SetAlignedPointerInInternalField(1, this);
 
@@ -439,7 +442,6 @@ public:
 			using ctor_type = T* (*)(v8::Isolate* isolate, Args...);
 			return call_from_v8(static_cast<ctor_type>(&factory<T>::create), args);
 		};
-		class_function_template()->Inherit(js_function_template());
 	}
 
 	template<typename U>
@@ -729,9 +731,16 @@ private:
 	{
 		v8::Isolate* isolate = info.GetIsolate();
 
-		T const& self = v8pp::from_v8<T const&>(isolate, info.This());
-		Attribute attr = detail::get_external_data<Attribute>(info.Data());
-		info.GetReturnValue().Set(to_v8(isolate, self.*attr));
+		try
+		{
+			T const& self = v8pp::from_v8<T const&>(isolate, info.This());
+			Attribute attr = detail::get_external_data<Attribute>(info.Data());
+			info.GetReturnValue().Set(to_v8(isolate, self.*attr));
+		}
+		catch (std::exception const& ex)
+		{
+			info.GetReturnValue().Set(throw_ex(isolate, ex.what()));
+		}
 	}
 
 	template<typename Attribute>
@@ -740,10 +749,17 @@ private:
 	{
 		v8::Isolate* isolate = info.GetIsolate();
 
-		T& self = v8pp::from_v8<T&>(isolate, info.This());
-		Attribute ptr = detail::get_external_data<Attribute>(info.Data());
-		using attr_type = typename detail::function_traits<Attribute>::return_type;
-		self.*ptr = v8pp::from_v8<attr_type>(isolate, value);
+		try
+		{
+			T& self = v8pp::from_v8<T&>(isolate, info.This());
+			Attribute ptr = detail::get_external_data<Attribute>(info.Data());
+			using attr_type = typename detail::function_traits<Attribute>::return_type;
+			self.*ptr = v8pp::from_v8<attr_type>(isolate, value);
+		}
+		catch (std::exception const& ex)
+		{
+			info.GetReturnValue().Set(throw_ex(isolate, ex.what()));
+		}
 	}
 };
 
